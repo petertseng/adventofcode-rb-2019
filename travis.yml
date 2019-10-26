@@ -1,0 +1,18 @@
+language: ruby
+rvm:
+  - '2.5'
+  - '2.4'
+matrix:
+  allow_failures:
+    - rvm: '2.4'
+script: |
+  bad=""
+  for f in *.rb; do
+    if ! ruby -c $f; then
+      bad="$bad $f"
+    fi
+  done
+  if [ -n "$bad" ]; then
+    echo "bad: $bad"
+    exit 1
+  fi

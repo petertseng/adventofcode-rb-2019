@@ -45,7 +45,7 @@ Interesting approaches:
 
 # Takeaways
 
-* None yet
+* Day 03 (Crossed Wires): A few errors when redoing multiple wire traces, by forgetting to reset the position. Would have been better to write the `trace_wire` function from the start, instead of inlining it initially as I did.
 
 # Posting schedule and policy
 

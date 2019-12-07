@@ -45,6 +45,7 @@ Interesting approaches:
 * Day 02 (Intcode): Assume linearity, determine coefficients with a few runs, determine noun and verb.
 * Day 03 (Crossed Wires): Storing segment endpoints is faster than storing every point touched by the wires.
 * Day 04 (Password): Skip over entire swaths of non-increasing passwords. If considering 341234, skip straight to 344444.
+* Day 07 (Amplification Circuit): Assume all amplifiers perform a linear transform mx+b and determine m and b to reduce the number of times the amplifiers need to be run.
 
 # Takeaways
 

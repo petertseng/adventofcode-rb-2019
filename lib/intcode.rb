@@ -42,6 +42,10 @@ class Intcode
     @output = []
   end
 
+  def halted?
+    @halt
+  end
+
   def step(
     input: -> { raise 'no input' },
     mem_range: nil, mem_start: 0, mem_len: nil, mem_all: false,

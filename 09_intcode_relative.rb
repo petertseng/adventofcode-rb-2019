@@ -3,6 +3,7 @@ require_relative 'lib/intcode'
 OPT = !ARGV.delete('--no-opt')
 SPARSE = ARGV.delete('-s')
 DISAS_DYNAMIC = ARGV.delete('-dd')
+disas_static = ARGV.delete('-ds')
 
 def run(mem, input)
   Intcode.new(mem, sparse: SPARSE, funopt: OPT).continue(disas: DISAS_DYNAMIC, input: input).output
@@ -12,3 +13,5 @@ mem = (ARGV[0]&.include?(?,) ? ARGV[0] : ARGF.read).split(?,).map(&method(:Integ
 
 puts run(mem, 1)
 puts run(mem, 2)
+
+Intcode.disas(mem) if disas_static

@@ -9,6 +9,7 @@ class Intcode
     6 => {type: :jump_zero, op: :==},
     7 => {type: :cmp, op: :<},
     8 => {type: :cmp, op: :==},
+    9 => {type: :adjust_rel_base},
   }.each_value(&:freeze).freeze
 
   NUM_PARAMS = {
@@ -18,6 +19,7 @@ class Intcode
     output: 1,
     jump_zero: 2,
     cmp: 3,
+    adjust_rel_base: 1,
   }.freeze
 
   # Note that outputs are still counted in params.
@@ -32,11 +34,14 @@ class Intcode
 
   def initialize(
     mem,
+    sparse: false,
     valid_ops: nil
   )
     @ops = valid_ops ? OPS.slice(*valid_ops).freeze : OPS
-    @mem = mem.dup
+    @sparse = sparse
+    @mem = sparse ? mem.each_with_index.to_h { |x, i| [i, x] }.tap { |h| h.default = 0 } : mem.dup
     @pos = 0
+    @relative_base = 0
     @halt = false
     @block = false
     @output = []
@@ -55,8 +60,15 @@ class Intcode
     raise "unknown opcode #{opcode} at #{@pos}" unless (op = @ops[opcode % 100])
 
     num_params = NUM_PARAMS.fetch(op[:type])
-    params = @mem[@pos + 1, num_params]
-    raise "Not enough params at #{@pos}: #{op} #{params}" if params.compact.size < num_params
+    params = @sparse ? num_params.times.map { |x| @mem[pos + 1 + x] } : mem[@pos + 1, num_params]
+    if params.compact.size < num_params
+      # Doesn't happen yet as of day 09, but will prepare.
+      # Also, should only happen in non-sparse mode since sparse has default 0
+      missing_params = num_params - params.size
+      params.concat([0] * missing_params)
+      # I won't bother adding @mem, either this is a branch back to 0,
+      # or we're going to execute an instruction 0 soon.
+    end
 
     num_outputs = NUM_OUTPUTS[op[:type]] || 0
     num_inputs = num_params - num_outputs
@@ -70,12 +82,14 @@ class Intcode
     out_resolved = []
 
     params.zip(modes).each_with_index { |(param, mode), i|
-      if mode != 1 && !(0...@mem.size).cover?(param)
+      param += @relative_base if mode == 2
+
+      if mode != 1 && param < 0
         raise "#{param} out of range at #{pos}: #{op} #{params}"
       end
 
       if i < num_inputs
-        resolved << (mode == 1 ? param : @mem[param])
+        resolved << (mode == 1 ? param : (@mem[param] || 0))
       else
         # Spec claims we'll never get mode 1, we won't check this.
         # The @mem needs to be indexed into at write site,
@@ -101,6 +115,8 @@ class Intcode
       @mem[out_resolved[0]] = resolved[0].send(op[:op], resolved[1]) ? 1 : 0
     when :halt
       @halt = true
+    when :adjust_rel_base
+      @relative_base += resolved[0]
     else raise "unknown type #{op} for opcode #{opcode} at #{@pos}"
     end
 

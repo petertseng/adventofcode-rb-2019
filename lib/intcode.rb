@@ -31,6 +31,7 @@ class Intcode
 
   attr_reader :mem, :pos, :output
   alias :memory :mem
+  attr_reader :times_run, :jumps_taken
 
   def initialize(
     mem,
@@ -55,6 +56,9 @@ class Intcode
     @cached_funcalls = Hash.new { |h, k| h[k] = {} }
     # inflight_funcalls[rb_when_called] = {args: [1, 2, 3], function: 123, nret: 1}
     @inflight_funcalls = {}
+
+    @times_run = Hash.new(0)
+    @jumps_taken = Hash.new(0)
   end
 
   def halted?
@@ -63,6 +67,7 @@ class Intcode
 
   def step(
     input: -> { raise 'no input' },
+    stats: false,
     mem_range: nil, mem_start: 0, mem_len: nil, mem_all: false,
     disas: false
   )
@@ -164,6 +169,12 @@ class Intcode
     when :adjust_rel_base
       @relative_base += resolved[0]
     else raise "unknown type #{op} for opcode #{opcode} at #{@pos}"
+    end
+
+    if stats
+      @times_run[@pos] += 1
+      natural_destination = @pos + 1 + num_params
+      @jumps_taken[[@pos, jumped_to]] += 1 if jumped_to && jumped_to != natural_destination
     end
 
     if disas

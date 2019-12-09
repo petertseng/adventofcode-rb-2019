@@ -7,8 +7,8 @@ class Intcode
     4 => {type: :output},
     5 => {type: :jump_zero, op: :!=},
     6 => {type: :jump_zero, op: :==},
-    7 => {type: :cmp, op: :<},
-    8 => {type: :cmp, op: :==},
+    7 => {type: :cmp, op: :<, opposite: :>=},
+    8 => {type: :cmp, op: :==, opposite: :!=},
     9 => {type: :adjust_rel_base},
   }.each_value(&:freeze).freeze
 
@@ -214,6 +214,119 @@ class Intcode
     @block = false
     step(**args) until @halt || @block
     self
+  end
+
+  def self.disas(mem)
+    mem = mem.dup
+
+    pos = 0
+    disas = []
+    prev_assign = {target: nil}
+    prev_stored_ret_addr = false
+
+    while (opcode = mem[pos])
+      unless (op = OPS[opcode % 100])
+        start = pos
+        # Not an op, so assume it's data. Collect data.
+        # Gets confused if there's a valid opcode lying in the data.
+        # Perhaps need to analyse actual jump targets in code?
+        pos += 1 until pos >= mem.size || possible_opcode?(mem[pos] || 0)
+        disas << {start: start, end: pos - 1, s: 'DATA', ints: mem[start...pos]}
+        next
+      end
+
+      num_params = NUM_PARAMS.fetch(op[:type])
+      modes = [(opcode / 100) % 10, (opcode / 1000) % 10, (opcode / 10000) % 10]
+      params = mem[pos + 1, num_params]
+      params << 0 until params.size >= num_params
+      fmt_params = params.zip(modes).map { |pm| fmt_param(*pm) }
+
+      s = case (t = op[:type])
+      when :binop, :cmp
+        if t == :cmp
+          just_assigned = {
+            target: fmt_params[2],
+            s_true: "#{fmt_params[0]} #{op[:op]} #{fmt_params[1]}",
+            s_false: "#{fmt_params[0]} #{op[:opposite]} #{fmt_params[1]}",
+          }
+        end
+
+        if fmt_params[0].is_a?(Integer) && fmt_params[1].is_a?(Integer)
+          result = fmt_params[0].send(op[:op], fmt_params[1])
+          just_stored_ret_addr = result > 0 && result == pos + 7
+        elsif op[:op] == :* && fmt_params.include?(1)
+          result = "#{fmt_params.find { |x| x != 1 }}"
+        elsif op[:op] == :+ && fmt_params.include?(0)
+          result = "#{fmt_params.find { |x| x != 0 }}"
+        else
+          result = "#{fmt_params[0]} #{op[:op]} #{fmt_params[1]}"
+        end
+
+        "#{fmt_params[2]} <- #{result}"
+      when :input
+        "#{fmt_params[0]} <- input"
+      when :output
+        "output #{fmt_params[0]}"
+      when :jump_zero
+        if prev_assign&.[](:target) &.== fmt_params[0]
+          # != 0 means true
+          "goto #{fmt_params[1]} if #{prev_assign[op[:op] == :!= ? :s_true : :s_false]}"
+        elsif fmt_params[0].is_a?(Integer)
+          if fmt_params[0].send(op[:op], 0)
+            "goto #{fmt_params[1]}#{' CALL' if prev_stored_ret_addr}#{' RET' if fmt_params[1] == fmt_param(0, 2)}"
+          else
+            'nop'
+          end
+        else
+          "goto #{fmt_params[1]} if #{fmt_params[0]} #{op[:op]} 0"
+        end
+      when :halt
+        'HALT'
+      when :adjust_rel_base
+        "$rb += #{fmt_params[0]}"
+      else raise "unknown type #{op} for opcode #{opcode} at #{pos}"
+      end
+
+      disas << {start: pos, end: pos + num_params, s: s, ints: mem[pos, 1 + num_params]}
+      pos += 1 + num_params
+      prev_assign = just_assigned
+      prev_stored_ret_addr = just_stored_ret_addr
+      just_assigned = nil
+      just_stored_ret_addr = nil
+    end
+
+    addr_len = (mem.size - 1).to_s.size
+    s_len = disas.map { |x| x[:s].to_s.size }.max
+    ints_len = disas.reject { |x| x[:s] == 'DATA' }.map { |x| x[:ints].to_s.size }.max
+
+    disas.each { |d|
+      fmt = "%#{addr_len}d %#{addr_len}d %-#{s_len}s %-#{ints_len}s"
+      dat = [
+        d[:start],
+        d[:end],
+        d[:s],
+        d[:ints],
+      ]
+      puts (fmt % dat).rstrip
+    }
+  end
+
+  def self.fmt_param(param, mode)
+    case mode
+    when 0; "%#{param}"
+    when 1; Integer(param)
+    when 2; "$rb[#{param}]"
+    else raise "Invalid mode #{mode}"
+    end
+  end
+
+  def self.possible_opcode?(opcode)
+    return false unless (op = OPS[opcode % 100])
+    modes = opcode.digits.drop(2)
+    return false if modes.size > NUM_PARAMS[op[:type]]
+    modes << 0 until modes.size == NUM_PARAMS[op[:type]]
+    num_outputs = NUM_OUTPUTS[op[:type]] || 0
+    modes.all? { |x| (0..2).cover?(x) } && modes.last(num_outputs).all? { |x| x != 1 }
   end
 
   def self.yellow(s)

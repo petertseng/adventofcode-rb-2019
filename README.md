@@ -38,7 +38,7 @@ Some may additionally support other ways:
 
 Favourite problems:
 
-* None yet
+* Day 10 (Monitoring Station): Interesting novel problem I hadn't seen before, and fun to think about asteroids being destroyed. Interesting educational value as well (reminder that atan2 exists).
 
 Interesting approaches:
 

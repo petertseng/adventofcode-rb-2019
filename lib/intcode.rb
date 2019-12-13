@@ -31,6 +31,8 @@ class Intcode
 
   attr_reader :mem, :pos, :output
   alias :memory :mem
+  attr_reader :relative_base
+
   attr_reader :times_run, :jumps_taken
 
   def initialize(
@@ -210,7 +212,9 @@ class Intcode
     self
   end
 
-  def continue(**args)
+  def continue(hijack: nil, **args)
+    @pos = hijack if hijack
+
     case args[:input]
     when Integer
       i = [args[:input]]

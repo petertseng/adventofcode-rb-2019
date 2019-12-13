@@ -39,6 +39,7 @@ Some may additionally support other ways:
 Favourite problems:
 
 * Day 10 (Monitoring Station): Interesting novel problem I hadn't seen before, and fun to think about asteroids being destroyed. Interesting educational value as well (reminder that atan2 exists).
+* Day 13 (Breakout): The first of the days where we saw some "creative" solutions since we have full control of the computer the Intcode program is running on. Some participants extended their paddle, some added walls at the bottom, some modified the code so that the bottom allows the ball to bounce, etc.
 
 Interesting approaches:
 
@@ -48,6 +49,7 @@ Interesting approaches:
 * Day 07 (Amplification Circuit): Assume all amplifiers perform a linear transform mx+b and determine m and b to reduce the number of times the amplifiers need to be run.
 * Day 09 (Intcode Relative): Function call optimisation. If a function is called multiple times with the same argument(s), immediately place the correct return value (from previous call) onto the stack and return. Turns the `f(n - 1) + f(n - 3)` recurrence runtime from exponential to linear.
 * Day 11 (Intcode Langton's Ant): Determine ant's periodicity by exmaining its program counter, then reimplement the logic natively to avoid calling the ant so many times.
+* Day 13 (Breakout): Hijack execution and call the function for when a block gets broken, passing it all block locations. Could do even better by extracting the affine transform constants (for score calculation) out of the program, but this seemed good enough.
 
 # Takeaways
 

@@ -227,7 +227,7 @@ class Intcode
     self
   end
 
-  def self.disas(mem)
+  def self.disas(mem, addrs_run: nil)
     mem = mem.dup
 
     pos = 0
@@ -236,12 +236,12 @@ class Intcode
     prev_stored_ret_addr = false
 
     while (opcode = mem[pos])
-      unless (op = OPS[opcode % 100])
+      if addrs_run && !addrs_run.has_key?(pos) || !(op = OPS[opcode % 100])
         start = pos
         # Not an op, so assume it's data. Collect data.
         # Gets confused if there's a valid opcode lying in the data.
         # Perhaps need to analyse actual jump targets in code?
-        pos += 1 until pos >= mem.size || possible_opcode?(mem[pos] || 0)
+        pos += 1 until pos >= mem.size || (!addrs_run || addrs_run.has_key?(pos)) && possible_opcode?(mem[pos] || 0)
         disas << {start: start, end: pos - 1, s: 'DATA', ints: mem[start...pos]}
         next
       end

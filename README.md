@@ -50,6 +50,7 @@ Interesting approaches:
 * Day 09 (Intcode Relative): Function call optimisation. If a function is called multiple times with the same argument(s), immediately place the correct return value (from previous call) onto the stack and return. Turns the `f(n - 1) + f(n - 3)` recurrence runtime from exponential to linear.
 * Day 11 (Intcode Langton's Ant): Determine ant's periodicity by exmaining its program counter, then reimplement the logic natively to avoid calling the ant so many times.
 * Day 13 (Breakout): Hijack execution and call the function for when a block gets broken, passing it all block locations. Could do even better by extracting the affine transform constants (for score calculation) out of the program, but this seemed good enough.
+* Day 15 (Intcode Search): Intcode machine can duplicate its state and return to it later. Multiverse repair droids.
 
 # Takeaways
 

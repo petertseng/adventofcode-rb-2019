@@ -41,6 +41,7 @@ class Intcode
 
   def initialize(
     mem,
+    pos: 0, relative_base: 0,
     funlog: false, funopt: false,
     sparse: false,
     valid_ops: nil
@@ -48,8 +49,8 @@ class Intcode
     @ops = valid_ops ? OPS.slice(*valid_ops).freeze : OPS
     @sparse = sparse
     @mem = sparse ? mem.each_with_index.to_h { |x, i| [i, x] }.tap { |h| h.default = 0 } : mem.dup
-    @pos = 0
-    @relative_base = 0
+    @pos = pos
+    @relative_base = relative_base
     @halt = false
     @block = false
     @output = []
@@ -65,6 +66,10 @@ class Intcode
 
     @times_run = Hash.new(0)
     @jumps_taken = Hash.new(0)
+  end
+
+  def dup
+    self.class.new(@mem, pos: @pos, relative_base: @relative_base)
   end
 
   def halted?

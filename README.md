@@ -52,6 +52,7 @@ Interesting approaches:
 * Day 13 (Breakout): Hijack execution and call the function for when a block gets broken, passing it all block locations. Could do even better by extracting the affine transform constants (for score calculation) out of the program, but this seemed good enough.
 * Day 15 (Intcode Search): Intcode machine can duplicate its state and return to it later. Multiverse repair droids.
 * Day 16 (Flawed Frequency Transmission): Part 1: Partial sum table. Part 2: binomial coefficients, Lewis's Theorem, Chinese Remainder Theorem. If one side of a product is known to be zero, do not calculate the other side of it.
+* Day 17 (Set And Forget): Teleport the robot by hijacking control.
 
 # Takeaways
 

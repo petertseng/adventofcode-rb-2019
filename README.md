@@ -32,6 +32,7 @@ In general, all solutions can be invoked in both of the following ways:
 Some may additionally support other ways:
 
 * All intcode days: May pass the intcode in ARGV as a single argument separated by commas.
+* Day 04 (Password): May pass min and max in ARGV (as two args, or as one arg joined by a hyphen).
 
 # Highlights
 
@@ -43,6 +44,7 @@ Interesting approaches:
 
 * Day 02 (Intcode): Assume linearity, determine coefficients with a few runs, determine noun and verb.
 * Day 03 (Crossed Wires): Storing segment endpoints is faster than storing every point touched by the wires.
+* Day 04 (Password): Skip over entire swaths of non-increasing passwords. If considering 341234, skip straight to 344444.
 
 # Takeaways
 

@@ -53,6 +53,7 @@ Interesting approaches:
 * Day 15 (Intcode Search): Intcode machine can duplicate its state and return to it later. Multiverse repair droids.
 * Day 16 (Flawed Frequency Transmission): Part 1: Partial sum table. Part 2: binomial coefficients, Lewis's Theorem, Chinese Remainder Theorem. If one side of a product is known to be zero, do not calculate the other side of it.
 * Day 17 (Set And Forget): Teleport the robot by hijacking control.
+* Day 19 (Tractor Beam): Assume beam always gets wider and moving to the right, and use this fact to query fewer locations while searching for the beam.
 
 # Takeaways
 

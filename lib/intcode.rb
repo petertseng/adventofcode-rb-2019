@@ -228,6 +228,8 @@ class Intcode
   end
 
   def self.disas(mem, addrs_run: nil)
+    return disas(mem.mem, addrs_run: mem.times_run) if mem.is_a?(self)
+
     mem = mem.dup
 
     pos = 0

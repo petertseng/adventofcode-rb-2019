@@ -238,6 +238,21 @@ class Intcode
     self
   end
 
+  def self.functions(mem)
+    calls = mem.each_cons(2).with_index.filter_map { |(op, arg), i|
+      i if op == 109 && arg > 0
+    }
+
+    returns = mem.each_cons(2).with_index.filter_map { |os, i|
+      i if os == [2106, 0] || os[0] == 2105 && os[1] != 0
+    }
+
+    returns.map { |ret|
+      call = calls.select { |c| c < ret }.max
+      call...ret
+    }
+  end
+
   def self.disas(mem, addrs_run: nil)
     return disas(mem.mem, addrs_run: mem.times_run) if mem.is_a?(self)
 

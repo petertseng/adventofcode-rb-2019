@@ -1,4 +1,6 @@
 class Intcode
+  CUSTOM_OPCODE = 10
+
   OPS = {
     99 => {type: :halt},
     1 => {type: :binop, op: :+},
@@ -10,6 +12,7 @@ class Intcode
     7 => {type: :cmp, op: :<, opposite: :>=},
     8 => {type: :cmp, op: :==, opposite: :!=},
     9 => {type: :adjust_rel_base},
+    CUSTOM_OPCODE => {type: :custom},
   }.each_value(&:freeze).freeze
 
   NUM_PARAMS = {
@@ -20,6 +23,7 @@ class Intcode
     jump_zero: 2,
     cmp: 3,
     adjust_rel_base: 1,
+    custom: 0,
   }.freeze
 
   # Note that outputs are still counted in params.
@@ -69,6 +73,7 @@ class Intcode
 
   def step(
     input: -> { raise 'no input' },
+    custom: ->ic { raise "custom at #{ic.pos}, but no custom provided" },
     stats: false,
     mem_range: nil, mem_start: 0, mem_len: nil, mem_all: false,
     disas: false
@@ -170,6 +175,8 @@ class Intcode
       @halt = true
     when :adjust_rel_base
       @relative_base += resolved[0]
+    when :custom
+      jumped_to = custom[self]
     else raise "unknown type #{op} for opcode #{opcode} at #{@pos}"
     end
 

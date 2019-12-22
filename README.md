@@ -55,6 +55,7 @@ Interesting approaches:
 * Day 17 (Set And Forget): Teleport the robot by hijacking control.
 * Day 19 (Tractor Beam): Assume beam always gets wider and moving to the right, and use this fact to query fewer locations while searching for the beam.
 * Day 21 (Springdroid Adventure): Replace Springdroid interpreter with custom instruction that performs the "jump or not?" calculation... or just calculate the correct answer the same way the program would calculate it.
+* Day 22 (Slam Shuffle): Although I understand modular inverses, I don't have a full grasp of all the linear solutions being posted on Reddit, so I just simplify shuffles into one of each operation.
 
 # Takeaways
 

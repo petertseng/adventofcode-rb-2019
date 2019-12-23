@@ -161,6 +161,7 @@ end
 
 slower = ARGV.delete('-ss')
 slow = ARGV.delete('-s')
+verbose = ARGV.delete('-v')
 input = (ARGV[0]&.include?(?,) ? ARGV[0] : ARGF.read)
 
 if input.include?(?,)
@@ -191,6 +192,185 @@ if ic && !slower
   exit 0
 end
 
-# legit version not written yet...
-_ = robot_loc
-puts 'possible'
+def left((dy, dx))
+  # (-1, 0) -> (0, -1) -> (1, 0) -> (0, 1) -> (-1, 0)
+  [-dx, dy]
+end
+
+def right((dy, dx))
+  # (-1, 0) -> (0, 1) -> (1, 0) -> (0, -1) -> (-1, 0)
+  [dx, -dy]
+end
+
+move = ->dir { robot_loc.zip(dir).map(&:sum) }
+
+scaffold = scaffold.to_h { |x| [x, true] }
+remain_scaffold = scaffold.dup
+
+can_move = ->dir { scaffold[move[dir]] }
+
+steps = []
+robot_dir = [-1, 0]
+
+until remain_scaffold.empty?
+  moves = 0
+  while can_move[robot_dir]
+    robot_loc = move[robot_dir]
+    moves += 1
+    remain_scaffold.delete(robot_loc)
+    next
+  end
+  steps << moves if moves > 0
+  break if remain_scaffold.empty?
+
+  can_turn = %i(left right).select { |dir| can_move[send(dir, robot_dir)] }
+  if can_turn.size == 1
+    steps << can_turn[0]
+    robot_dir = send(can_turn[0], robot_dir)
+    next
+  end
+
+  raise "need exactly one turn at #{robot_loc}, not #{can_turn}"
+end
+
+steps_str = steps.map { |x| {left: ?L, right: ?R}[x] || (?F * x) }.join
+
+MAX_LEN = 20
+
+# Only meant for use when items will STRICTLY alternate between F and non-F.
+# Not for use for displaying intermediate compression results, where we might have AA etc.,
+# which would just show up as A.
+def chunk(func_raw)
+  func_raw.chars.chunk(&:itself).map { |letter, insts| letter == ?F ? insts.size : letter }
+end
+
+# OK for use when showing intermediate compression results
+def chunk2(func_raw)
+  func_raw.chars.chunk { |x| x == ?F }.flat_map { |f, insts| f ? [insts.size] : insts }
+end
+
+def compress(
+  free_letters, main, assigned_letters = [],
+  split_moves: false, split_turns: false, split_turns2: false,
+  verbose: false
+)
+  if free_letters.empty?
+    chars = main.chars
+    return [] unless chars.all? { |c| (?A..?C).cover?(c) }
+    main = chars.join(?,)
+
+    return [] if main.size > MAX_LEN
+    return [[main] + assigned_letters]
+  end
+
+  unless (start = main.chars.index { |c| !(?A..?C).cover?(c) })
+    # Erm, I guess we don't need to assign anything more?
+    return compress([], main, assigned_letters + free_letters.map { '' })
+  end
+
+  letter = free_letters.first
+  possible_lengths = []
+
+  1.step { |len|
+    break if (?A..?C).cover?(main[start + len - 1])
+    break if start + len > main.size
+    next if !split_moves && main[start + len - 1] == ?F && main[start + len] == ?F
+
+    func_raw = main[start, len]
+    func_chunks = chunk(func_raw)
+    comma_joined_length = func_chunks.join(?,).size
+    break if comma_joined_length > MAX_LEN
+
+    possible_lengths << [func_raw, func_chunks, comma_joined_length]
+  }
+
+  possible_lengths.reverse_each.flat_map { |func_raw, func_chunks, comma_joined_length|
+    # If it ends on a number, consider adding a turn to this function and the opposite turn to the next.
+    # Not necessary on askalski's input, but I remain convinced it's theoretically necessary.
+    # See mk17.rb A,A,B,C,A,C,C,B,A    R,10,L,6,L,10,R,6,L    6,L,4,L,10,R,10,L,8    R,8,L,10,L,6,R,6
+    possible_funcs = if split_turns2 && func_chunks[-1].is_a?(Integer) && comma_joined_length + 2 <= MAX_LEN
+      turn_pairs = [[nil, ''], [?L, ?R], [?R, ?L]]
+      turn_pairs.map { |term_turn, add_turn|
+        [
+          func_raw,
+          (func_chunks + (term_turn ? [term_turn] : [])).join(?,),
+          letter + add_turn,
+        ]
+      }
+    else
+      [[func_raw, func_chunks.join(?,), letter]]
+    end
+
+    possible_funcs.flat_map { |func_raw, func_comma, replace_with|
+      allowed_subs = [[func_raw, replace_with]]
+      if split_turns && func_raw.size > 1
+        # If it starts with a turn, also allow placing the opposite turn before.
+        if func_raw.start_with?(?R)
+          allowed_subs << [func_raw[1..-1], ?L + replace_with]
+        elsif func_raw.start_with?(?L)
+          allowed_subs << [func_raw[1..-1], ?R + replace_with]
+        end
+      end
+      if split_turns2 && func_raw.size > 1 && replace_with.size > 1 && 'LR'.include?(func_comma[-1])
+        # Function ends with a turn (such as A = 10,R), there are two choices:
+        # Replace 10 with A,L (equivalent to 10,R,L = 10)
+        # Replace 10,R with A
+        allowed_subs << [func_raw + func_comma[-1], replace_with[0..-2]]
+        allowed_subs << ['LR', '']
+        allowed_subs << ['RL', '']
+      end
+
+      new_main = main.dup
+      allowed_subs.each { |from, to|
+        new_main.gsub!(from, to)
+        # If it ends with a turn, allow replacing at the very end as well.
+        if from.size > 1 && 'LR'.include?(from[-1])
+          new_main.sub!(/#{from[0..-2]}$/, to)
+        end
+      }
+
+      # Since function calls are irreducible,
+      # prune search if we have too many of them.
+      # (N function calls needs N-1 commas, so it's 2N-1)
+      function_calls = new_main.chars.count { |c| (?A..?C).cover?(c) }
+      next [] if function_calls * 2 - 1 > MAX_LEN
+
+      # For debugging, put the expected letter assignments here.
+      expected = [
+        nil,
+      ]
+      right_track = (assigned_letters + [func_comma]).zip(expected).all? { |a, b| a == b }
+
+      if verbose || right_track
+        puts "#{chunk2(main).join(?,)}: assign #{letter} <- #{func_comma}, replace #{func_raw} w/ #{replace_with}, now #{chunk2(new_main).join(?,)}"
+      end
+
+      compress(
+        free_letters[1..-1], new_main, assigned_letters + [func_comma],
+        verbose: verbose, split_moves: split_moves, split_turns: split_turns,
+      )
+    }
+  }
+end
+
+# split_moves and split_turns only needed to solve some hard inputs:
+# https://www.reddit.com/r/adventofcode/comments/ebz338/2019_day_17_part_2_pathological_pathfinding/
+# Try it without them first, then try it if needed.
+solns = compress(%w(A B C), steps_str)
+solns = compress(%w(A B C), steps_str, split_moves: true, split_turns: true) if solns.empty?
+if solns.empty?
+  puts 'split_turns2 needed' if verbose
+  solns = compress(%w(A B C), steps_str, split_moves: true, split_turns: true, split_turns2: true)
+end
+solns.each { |soln|
+  soln << ?n
+  if ic
+    output = ic.dup.continue(input: soln).output
+    puts output.select { |x| x > 127 }
+  end
+}
+if verbose
+  puts solns
+elsif !ic
+  puts solns.empty? ? 'impossible' : 'possible'
+end

@@ -12,6 +12,7 @@
     al = a >> 1
     cl = c >> 1
     lower_bits = (b ^ d) | (al & cl) | (bd & (al | cl))
+    #lower_bits = ((b | d) & (al | cl | ~bd)) | (al & cl)
     got = upper_bits | lower_bits
 
     if got != expected

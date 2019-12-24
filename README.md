@@ -33,6 +33,7 @@ Some may additionally support other ways:
 
 * All intcode days: May pass the intcode in ARGV as a single argument separated by commas.
 * Day 04 (Password): May pass min and max in ARGV (as two args, or as one arg joined by a hyphen).
+* Day 24 (Planet of Discord): May pass biodiversity rating in ARGV.
 
 # Highlights
 
@@ -56,6 +57,11 @@ Interesting approaches:
 * Day 19 (Tractor Beam): Assume beam always gets wider and moving to the right, and use this fact to query fewer locations while searching for the beam.
 * Day 21 (Springdroid Adventure): Replace Springdroid interpreter with custom instruction that performs the "jump or not?" calculation... or just calculate the correct answer the same way the program would calculate it.
 * Day 22 (Slam Shuffle): Although I understand modular inverses, I don't have a full grasp of all the linear solutions being posted on Reddit, so I just simplify shuffles into one of each operation.
+* Day 24 (Planet of Discord): With the recursion, it's not easy to use the [usual tricks](http://dotat.at/prog/life/life.html) for optimising Game of Life. Best I could do was:
+  * Pack neighbour counts into a single int per level, since only four values matter (0, 1, 2, 3+)
+  * Group cells together and propagate all neighbour counts of the entire group at once. Combine with other neighbour counts using bitwise operations to achieve saturating addition per group of two bits.
+  * Pack grid state into a single int per level.
+  * Compute neighbour count + current state -> new state in groups.
 
 # Takeaways
 

@@ -46,6 +46,7 @@ Interesting approaches:
 * Day 03 (Crossed Wires): Storing segment endpoints is faster than storing every point touched by the wires.
 * Day 04 (Password): Skip over entire swaths of non-increasing passwords. If considering 341234, skip straight to 344444.
 * Day 07 (Amplification Circuit): Assume all amplifiers perform a linear transform mx+b and determine m and b to reduce the number of times the amplifiers need to be run.
+* Day 09 (Intcode Relative): Function call optimisation. If a function is called multiple times with the same argument(s), immediately place the correct return value (from previous call) onto the stack and return. Turns the `f(n - 1) + f(n - 3)` recurrence runtime from exponential to linear.
 
 # Takeaways
 

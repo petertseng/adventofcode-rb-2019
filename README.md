@@ -62,6 +62,7 @@ Interesting approaches:
   * Group cells together and propagate all neighbour counts of the entire group at once. Combine with other neighbour counts using bitwise operations to achieve saturating addition per group of two bits.
   * Pack grid state into a single int per level.
   * Compute neighbour count + current state -> new state in groups.
+* Day 25 (Cryostasis): Extract correct answer from where it's hidden in memory.
 
 # Takeaways
 

@@ -34,6 +34,7 @@ class Intcode
 
   def initialize(
     mem,
+    funlog: false, funopt: false,
     sparse: false,
     valid_ops: nil
   )
@@ -45,6 +46,15 @@ class Intcode
     @halt = false
     @block = false
     @output = []
+
+    @relative_writes = []
+    @funopt = funopt
+    @funlog = funlog
+    @funopt_or_log = funopt || funlog
+    # cached_funcalls[function_address][args] = result
+    @cached_funcalls = Hash.new { |h, k| h[k] = {} }
+    # inflight_funcalls[rb_when_called] = {args: [1, 2, 3], function: 123, nret: 1}
+    @inflight_funcalls = {}
   end
 
   def halted?
@@ -95,12 +105,22 @@ class Intcode
         # The @mem needs to be indexed into at write site,
         # so just put the address in.
         out_resolved << param
+        if @funopt_or_log
+          if mode == 2
+            @relative_writes.unshift(param - @relative_base)
+          else
+            @relative_writes.unshift(nil)
+          end
+          @relative_writes.pop if @relative_writes.size > 2
+        end
       end
     }
 
     case op[:type]
     when :binop
-      @mem[out_resolved[0]] = resolved[0].send(op[:op], resolved[1])
+      result = resolved[0].send(op[:op], resolved[1])
+      @mem[out_resolved[0]] = result
+      just_stored_ret_addr = result > 0 && result == @pos + 7
     when :input
       if (got_input = input[])
         @mem[out_resolved[0]] = got_input
@@ -111,6 +131,32 @@ class Intcode
       output.concat(resolved)
     when :jump_zero
       jumped_to = resolved[1] if resolved[0].send(op[:op], 0)
+
+      # Try to cache results of function calls.
+      if jumped_to && @funopt_or_log
+        if jumped_to == @mem[@relative_base] && (inflight = @inflight_funcalls.delete(@relative_base))
+          # RET
+          returned = @mem[@relative_base + 1, inflight[:nret]].freeze
+          puts "f#{inflight[:function]}(#{inflight[:args]}) = #{returned}" if @funlog
+          @cached_funcalls[inflight[:function]][inflight[:args]] = returned if @funopt
+        elsif @prev_stored_ret_addr
+          # CALL
+          num_args = @relative_writes[0] == 0 && @relative_writes[1]&.>(0) ? @relative_writes[1] : 0
+
+          args = @mem[@relative_base + 1, num_args].freeze
+          if (cached_result = @cached_funcalls[jumped_to][args])
+            # funcall w/ args we seen before
+            # insert cached result and immediately return.
+            @mem[@relative_base + 1, cached_result.size] = cached_result
+            jumped_to = @mem[@relative_base]
+          else
+            # new funcall w/ args we haven't seen before
+            # do it and mark as in flight
+            # Hmm, assuming all functions return only 1 value???
+            @inflight_funcalls[@relative_base] = {args: args, function: jumped_to, nret: 1}.freeze
+          end
+        end
+      end
     when :cmp
       @mem[out_resolved[0]] = resolved[0].send(op[:op], resolved[1]) ? 1 : 0
     when :halt
@@ -147,6 +193,8 @@ class Intcode
     end
 
     @pos = jumped_to || @pos + 1 + num_params unless @block
+
+    @prev_stored_ret_addr = just_stored_ret_addr
 
     self
   end

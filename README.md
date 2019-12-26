@@ -42,6 +42,7 @@ Favourite problems:
 Interesting approaches:
 
 * Day 02 (Intcode): Assume linearity, determine coefficients with a few runs, determine noun and verb.
+* Day 03 (Crossed Wires): Storing segment endpoints is faster than storing every point touched by the wires.
 
 # Takeaways
 

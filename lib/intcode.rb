@@ -72,6 +72,10 @@ class Intcode
     self.class.new(@mem, pos: @pos, relative_base: @relative_base)
   end
 
+  def ascii_output
+    @output.pack('c*')
+  end
+
   def halted?
     @halt
   end
@@ -231,9 +235,18 @@ class Intcode
     when Integer
       i = [args[:input]]
       args[:input] = -> { i.shift }
+    when String
+      i = args[:input].chars.map(&:ord)
+      i << 10 unless i[-1] == 10
+      args[:input] = -> { i.shift }
     when Array
       i = args[:input]
-      unless i.all? { |x| x.is_a?(Integer) }
+      if i.all? { |x| x.is_a?(String) }
+        i = i.flat_map { |x|
+          ords = x.chars.map(&:ord)
+          ords[-1] == 10 ? ords : (ords << 10)
+        }
+      elsif !i.all? { |x| x.is_a?(Integer) }
         raise "Unknown input type #{i}"
       end
       args[:input] = -> { i.shift }

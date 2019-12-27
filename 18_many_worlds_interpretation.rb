@@ -95,14 +95,20 @@ def all_keys_time(keys_from, num_keys, robots)
   # With the key bitfield taking 26 bits, the entire state fits within 46 bits.
   bits_per_robot = keys_from.size.bit_length
   robot_mask = (1 << bits_per_robot) - 1
-  robot_base = (0...robots.size).map { |i| bits_per_robot * i + num_keys }
+  base = num_keys
 
-  cost, _junk = Search.astar(
-    # Assumption: Renumbering done by keys_from put the robots first.
-    robots.zip(robot_base).map { |bot, base| bot << base }.reduce(0, :|),
-    neighbours: ->(robots_and_keys) {
-      keys = robots_and_keys & all_keys
-      robot_base.flat_map { |base|
+  robots.sum { |robot|
+    my_keys_from = keys_from[robot]
+    reachable_keys = my_keys_from.map { |k| k[:keys] }.reduce(0, :|)
+    reachable_doors = my_keys_from.map { |k| k[:doors] }.reduce(0, :|)
+    # Just unlock all doors that we don't have the key for.
+    # Assume that other robots can handle it.
+    doors_without_keys = reachable_doors & ~reachable_keys
+
+    cost, _junk = Search.astar(
+      (robot << base) | doors_without_keys,
+      neighbours: ->(robots_and_keys) {
+        keys = robots_and_keys & all_keys
         robot = (robots_and_keys >> base) & robot_mask
 
         keys_from[robot].filter_map { |key|
@@ -113,18 +119,16 @@ def all_keys_time(keys_from, num_keys, robots)
 
           [(robots_and_keys & ~(robot_mask << base)) | (key[:pos] << base) | key[:keys], key[:dist]]
         }
-      }
-    },
-    # heuristic - max dist to remaining keys is at most harmless,
-    # but does help for certain inputs, it seems.
-    # Also tried unsuccessfully:
-    # * MST of remaining keys
-    # * number remaining keys * minimum distance between two keys
-    # * Dijkstra's:
-    # heuristic: Hash.new(0),
-    heuristic: ->(robots_and_keys) {
-      keys = robots_and_keys & all_keys
-      robot_base.sum { |base|
+      },
+      # heuristic - max dist to remaining keys is at most harmless,
+      # but does help for certain inputs, it seems.
+      # Also tried unsuccessfully:
+      # * MST of remaining keys
+      # * number remaining keys * minimum distance between two keys
+      # * Dijkstra's:
+      # heuristic: Hash.new(0),
+      heuristic: ->(robots_and_keys) {
+        keys = robots_and_keys & all_keys
         robot = (robots_and_keys >> base) & robot_mask
 
         # since keys_from is sorted in descending order of dist:
@@ -133,12 +137,12 @@ def all_keys_time(keys_from, num_keys, robots)
         }
 
         not_picked_up&.[](:dist) || 0
-      }
-    },
-    goal: ->(robots_and_keys) { robots_and_keys & all_keys == all_keys },
-  )
+      },
+      goal: ->(robots_and_keys) { robots_and_keys & reachable_keys == reachable_keys },
+    )
 
-  cost
+    cost
+  }
 end
 
 input = ARGF.map(&:chomp).map(&:freeze).freeze

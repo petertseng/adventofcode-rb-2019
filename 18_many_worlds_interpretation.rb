@@ -1,4 +1,5 @@
 require_relative 'lib/search'
+require_relative 'lib/union_find'
 
 def bitfield(chars, range)
   base = range.begin.ord
@@ -49,6 +50,7 @@ def key_to_key(flat_input, width, sources)
       things_on_path = path.map { |path_pos| flat_input[path_pos] }
 
       [idx[pos], {
+        from: i,
         pos: idx[pos],
         dist: dist,
         # Represent keys and doors as bitfields so set intersections become cheap
@@ -73,6 +75,7 @@ def all_pairs(keys_from)
         ij = keys_from.dig(i, j)
         if !ij || ij[:dist] > new_dist
           keys_from[i][j] = {
+            from: i,
             pos: kj[:pos],
             dist: new_dist,
             keys: ik[:keys] | kj[:keys],
@@ -96,6 +99,9 @@ def all_keys_time(keys_from, num_keys, robots)
   bits_per_robot = keys_from.size.bit_length
   robot_mask = (1 << bits_per_robot) - 1
   robot_base = (0...robots.size).map { |i| bits_per_robot * i + num_keys }
+
+  edges = keys_from.flatten.select { |k| k[:from] < k[:pos] }.sort_by { |k| k[:dist] }
+  mst_cache = {}
 
   cost, _junk = Search.astar(
     # Assumption: Renumbering done by keys_from put the robots first.
@@ -126,13 +132,33 @@ def all_keys_time(keys_from, num_keys, robots)
       keys = robots_and_keys & all_keys
       robot_base.sum { |base|
         robot = (robots_and_keys >> base) & robot_mask
-
-        # since keys_from is sorted in descending order of dist:
-        not_picked_up = keys_from[robot].find { |key|
+        remaining_keys = keys_from[robot].select { |key|
           key[:keys] | keys != keys
         }
+        key_poses = remaining_keys.map { |k| k[:pos] } << robot
+        key_bits = key_poses.sum { |k| 1 << k }
 
-        not_picked_up&.[](:dist) || 0
+        mst_cache[key_bits] ||= begin
+          mst_cost = 0
+          relevant_edges = edges.select { |k|
+            key_bits[k[:from]] != 0 && key_bits[k[:pos]] != 0
+          }
+          # This is slower
+          #relevant_edges = key_poses.flat_map { |pos|
+          #  keys_from[pos].select { |k| key_bits[k[:pos]] != 0 && k[:from] < k[:pos] }
+          #}.sort_by { |k| k[:dist] }
+          forests = UnionFind.new(key_poses)
+          relevant_edges.each { |k|
+            u = forests.find(k[:from])
+            v = forests.find(k[:pos])
+            next if u == v
+
+            mst_cost += k[:dist]
+            forests.union(u, v)
+          }
+
+          mst_cost
+        end
       }
     },
     goal: ->(robots_and_keys) { robots_and_keys & all_keys == all_keys },
@@ -182,13 +208,13 @@ if can_part_2
 
   k2k1 = k2k.map(&:dup)
   add_pair = ->(i, j, dist) {
-    k2k1[i][j] = {pos: j, dist: dist, keys: 0, doors: 0}.freeze
-    k2k1[j][i] = {pos: i, dist: dist, keys: 0, doors: 0}.freeze
+    k2k1[i][j] = {from: i, pos: j, dist: dist, keys: 0, doors: 0}.freeze
+    k2k1[j][i] = {from: j, pos: i, dist: dist, keys: 0, doors: 0}.freeze
   }
   (1..4).each { |i|
     # Allow each key to go back to the corner (part 2 entrances).
     # Normally, they would not try to because the corner has no keys.
-    k2k1[i].each { |k, v| k2k1[k][i] = v.merge(pos: i) }
+    k2k1[i].each { |k, v| k2k1[k][i] = v.merge(from: k, pos: i) }
     # Centre (part 1 entrance) is 2 away from each corner (part 2 entrances)
     add_pair[0, i, 2]
   }

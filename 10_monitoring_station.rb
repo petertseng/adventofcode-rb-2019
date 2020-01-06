@@ -1,3 +1,5 @@
+TO_DESTROY = 200
+
 def asteroid_in_direction(start, dy, dx, asteroids, height, width)
   # Be careful here.
   # You cannot just add (dy * width + dx) to (y * width + x) blindly.
@@ -67,32 +69,44 @@ station, max = detect.max_by(&:last)
 p max
 p station if verbose
 
-# can't destroy itself, so exactly 200 is also not enough. <= instead of < is intentional.
-if asteroids.size <= 200
+# <= instead of < is intentioal: can't destroy itself!
+if asteroids.size <= TO_DESTROY
   puts "bad #{asteroids.size}"
   exit 1
 end
 
-# Encoding these as dy * width + dx would require translating negative dx.
-# And part 2 takes only 1/30 the time of part 1, not worth trying to improve it.
-dirs = (-height..height).flat_map { |dy|
-  (-width..width).filter_map { |dx|
-    [dy, dx] if dy.gcd(dx) == 1
-  }
+sy, sx = station.divmod(width)
+has_at_least = Hash.new(0)
+in_dir = Hash.new { |h, k| h[k] = [] }
+
+# Using rationals is slightly faster than using atan2.
+# Could also skip entire quadrants with more granular counters
+# (quadrant_has_at_least instead of has_at_least)
+# but part 2 runs in about 1/30 the time of part 1
+# (even with atan2), so it's not worth optimising further.
+asteroids.keys.each { |pos|
+  next if pos == station
+  y, x = pos2d = pos.divmod(width)
+  dy = y - sy
+  dx = x - sx
+  # Sort as follows:
+  # 0 = directly above (dx = 0, dy < 0)
+  # 1 = right (dx > 0), then sort by angle
+  # 2 = directly below (dx = 0, dy > 0)
+  # 3 = left (dx < 0), then sort by angle
+  key = (dx == 0 ? [dy < 0 ? 0 : 2] : [dx > 0 ? 1 : 3, Rational(dy, dx)]).freeze
+  new_size = (in_dir[key] << pos2d).size
+  has_at_least[new_size] += 1
 }
 
-count = 0
-# atan2 returns between -pi and pi.
-# Returns pi for (0, -1)
-# We want [dy = -1, dx = 0] to be first,
-# So that means we do atan2(dx, dy) and reverse it.
-dirs.sort_by { |dy, dx| -Math.atan2(dx, dy) }.cycle { |dy, dx|
-  next unless (asteroid = asteroid_in_direction(station, dy, dx, asteroids, height, width))
-  asteroids.delete(asteroid)
-  puts "#{count + 1} destroy #{asteroid.divmod(width)}" if verbose
-  if (count += 1) == 200
-    y, x = asteroid.divmod(width)
-    puts x * 100 + y
-    break
-  end
-}
+remain = TO_DESTROY
+round = 1
+until has_at_least[round] >= remain
+  remain -= has_at_least[round]
+  round += 1
+end
+
+candidates = round == 1 ? in_dir : in_dir.select { |_, v| v.size >= round }
+_, at_angle = candidates.sort_by(&:first)[remain - 1]
+y, x = at_angle.min_by(round) { |y, x| (y - sy).abs + (x - sx).abs }[-1]
+puts x * 100 + y

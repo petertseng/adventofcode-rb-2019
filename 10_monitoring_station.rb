@@ -76,37 +76,47 @@ if asteroids.size <= TO_DESTROY
 end
 
 sy, sx = station.divmod(width)
-has_at_least = Hash.new(0)
+has_at_least = Hash.new { |h, k| h[k] = [0, 0, 0, 0] }
 in_dir = Hash.new { |h, k| h[k] = [] }
 
-# Using rationals is slightly faster than using atan2.
-# Could also skip entire quadrants with more granular counters
-# (quadrant_has_at_least instead of has_at_least)
-# but part 2 runs in about 1/30 the time of part 1
-# (even with atan2), so it's not worth optimising further.
+# Two optimisations:
+# - Using rationals is slightly faster than using atan2.
+# - Skip quadrants to avoid having to sort them.
+# But part 2 runs in about 1/30 the time of part 1
+# (even without both of these), so this was mostly academic.
 asteroids.keys.each { |pos|
   next if pos == station
   y, x = pos2d = pos.divmod(width)
   dy = y - sy
   dx = x - sx
-  # Sort as follows:
-  # 0 = directly above (dx = 0, dy < 0)
-  # 1 = right (dx > 0), then sort by angle
-  # 2 = directly below (dx = 0, dy > 0)
-  # 3 = left (dx < 0), then sort by angle
-  key = (dx == 0 ? [dy < 0 ? 0 : 2] : [dx > 0 ? 1 : 3, Rational(dy, dx)]).freeze
+  quadrant, _ = key = if dy < 0 && dx >= 0
+    [0, Rational(dx, -dy)]
+  elsif dy >= 0 && dx > 0
+    [1, Rational(dy, dx)]
+  elsif dy > 0 && dx <= 0
+    [2, Rational(-dx, dy)]
+  elsif dy <= 0 && dx < 0
+    [3, Rational(-dy, -dx)]
+  else
+    raise "no quadrant for #{dy} #{dx}"
+  end
   new_size = (in_dir[key] << pos2d).size
-  has_at_least[new_size] += 1
+  has_at_least[new_size][quadrant] += 1
 }
 
 remain = TO_DESTROY
 round = 1
-until has_at_least[round] >= remain
-  remain -= has_at_least[round]
-  round += 1
+quadrant = 0
+until has_at_least[round][quadrant] >= remain
+  remain -= has_at_least[round][quadrant]
+  quadrant += 1
+  if quadrant == 4
+    quadrant = 0
+    round += 1
+  end
 end
 
-candidates = round == 1 ? in_dir : in_dir.select { |_, v| v.size >= round }
+candidates = in_dir.select { |(q, _), v| q == quadrant && v.size >= round }
 _, at_angle = candidates.sort_by(&:first)[remain - 1]
 y, x = at_angle.min_by(round) { |y, x| (y - sy).abs + (x - sx).abs }[-1]
 puts x * 100 + y

@@ -37,27 +37,15 @@ raise "Can't do it the fast way" unless offset * 2 >= input.size * 10000
 # The coefficients for the 100th iteration can be calculated and reused.
 # They would otherwise be very large, but all operations are modulo 10.
 # So a few theorems can help make it easier.
+#
+# We want we're going to want binom(99 + i, i) % 10.
+# Because binom(n, k) == binom(n, n - k), that's equal to:
+# binom(99 + i, 99) % 10.
 
-def binom(n, k)
-  k == 0 ? 1 : n * binom(n - 1, k - 1) / k
-end
-
-def binom_mod(n, k, m)
-  # Assumes (without checking) that m is prime
-  # Lucas's Theorem
-  return 1 if k == 0
-
-  r = binom(n % m, k % m) % m
-  return r if n < m
-
-  # zero times anything is zero, no need to spawn more recursive calls.
-  return 0 if r == 0
-
-  (r * binom_mod(n / m, k / m, m)) % m
-end
-
-def binom_mod_10(n, k)
-  # Chinese Remainder Theorem
+# Calculates binom(99 + i, 99) % 10.
+def binom_99_mod_10(i)
+  # By Chinese Remainder Theorem...
+  #
   # x congruent to a_i mod n_i
   # x = sum a_i y_i z_i
   # y_i is the product of all other moduli
@@ -69,10 +57,36 @@ def binom_mod_10(n, k)
   # 1 * 5 = 5
   # 2 * 3 = 6
   #
-  #(binom_mod(n, k, 2) * 5 + binom_mod(n, k, 5) * 6) % 10
-  # By Lucas's Theorem, binom(n, k) % 2 is equal to (n & k == k ? 1 : 0).
-  #((n & k == k ? 1 : 0) * 5 + binom_mod(n, k, 5) * 6) % 10
-  ((n & k == k ? 5 : 0) + binom_mod(n, k, 5) * 6) % 10
+  # So that tells us we want:
+  # (binom(99 + i, 99) % 2) * 5 + (binom(99 + i, 99) % 5) * 6
+  #
+  # By Lucas's Theorem, binom(n, k) % 2 depends on the base-2 expansion of n and k.
+  # It's only nonzero if all digits of the expansions paired together are nonzero,
+  # Therefore, is equal to (n & k == k ? 1 : 0).
+  #
+  # So (binom(99 + i, 99) % 2) * 5 is rewritten as:
+  # ((99 + i) & 99 == 99 ? 1 : 0) * 5, or:
+  mod_2_term = (99 + i) & 99 == 99 ? 5 : 0
+
+  # In the same way, binom(n, k) % 5 depends on the base-5 expansion of n and k.
+  # The base-5 expansion of 99 is 344_5.
+  # If any base-5 digit of 99 + i is less than the corresponding base-5 digit in 344_5,
+  # then that contributes binom(n, k) for n < k, which is always 0
+  # (e.g. 2 choose 4 == 0).
+  # So the only possibilities for last three base-5 digits of base-5 expansion for n must be 344_5 or 444_5.
+  # For 344_5, result is binom(3, 3) * binom(4, 4) * binom(4, 4) = 1 * 1 * 1 = 1.
+  # For 444_5, result is binom(4, 3) * binom(4, 4) * binom(4, 4) = 4 * 1 * 1 = 4.
+  # Multiply by 6 to get 6 and 24, mod by 10 to get 6 and 4.
+  #
+  # These cases happen when (99 + i) % 125 == 99 and (99 + i) % 125 == 124.
+  # Subtract 99 from both sides to get i % 125 == 0 and i % 125 == 25.
+  mod_5_term = case i % 125
+  when 0; 6
+  when 25; 4
+  else; 0
+  end
+
+  (mod_2_term + mod_5_term) % 10
 end
 
 big_size = input.size * 10000 - offset
@@ -80,7 +94,7 @@ rsize = 8
 
 result = [0] * rsize
 big_size.times { |i|
-  bin = binom_mod_10(99 + i, i)
+  bin = binom_99_mod_10(i)
   # No point doing array reads/writes if they're going to be multiplied by zero.
   # Saves a decent chunk of time since about 92.25% of the coefficients are zero...
   next if bin == 0
